@@ -1,0 +1,1 @@
+pyinstaller speaker_appliance.spec

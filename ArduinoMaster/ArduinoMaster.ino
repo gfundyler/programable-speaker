@@ -2,93 +2,172 @@
 // Data R Out
 // Data L Out
 // CLK    Out
-
-//A0 Rotor speed
-//A1 effects intensity
-//A2 Volume
   
 void setup() {
   // put your setup code here, to run once:
-  pinMode(0, INPUT);  // 100 hz interrupt          
-  pinMode(1, OUTPUT); // motor serial data R
-  pinMode(2, OUTPUT); // motor serial data L
-  pinMode(3, OUTPUT); // Motor serial clock
+  pinMode(18, INPUT);  // 100 hz interrupt          
+  pinMode(20, OUTPUT); // motor serial data R
+  pinMode(21, OUTPUT); // motor serial data L
+  pinMode(19, OUTPUT); // Motor serial clock
 
-  pinMode(14, OUTPUT); // Display Bit 0
-  pinMode(15, OUTPUT); // Display Bit 1
-  pinMode(16, OUTPUT); // Display Bit 2
-  pinMode(17, OUTPUT); // Display Bit 3
-  pinMode(18, OUTPUT); // Display Bit 4
-  pinMode(19, OUTPUT); // Display Bit 5
-  pinMode(20, OUTPUT); // Display Bit 6
-  pinMode(21, OUTPUT); // Display Bit 7
+  pinMode(A8, OUTPUT); // Display Bit 0
+  pinMode(A9, OUTPUT); // Display Bit 1
+  pinMode(A10, OUTPUT); // Display Bit 2
+  pinMode(A11, OUTPUT); // Display Bit 3
+  pinMode(A12, OUTPUT); // Display Bit 4
+  pinMode(A13, OUTPUT); // Display Bit 5
+  pinMode(A14, OUTPUT); // Display Bit 6
+  pinMode(A15, OUTPUT); // Display Bit 7
+
+  pinMode(A0, INPUT); // Rotor Speed Pedal
+  pinMode(A1, INPUT); // Effects Intensity Pedal
+  pinMode(A2, INPUT); // Volume Pedal
 
   pinMode(25, INPUT);  // PATCH Up
   pinMode(26, INPUT);  // PATCH Down
 
-  pinMode(30, OUTPUT); // DAC CS
-  pinMode(31, OUTPUT); // DAC CLK
+  pinMode(27, OUTPUT); // DAC CS
+  pinMode(38, OUTPUT); // DAC CLK
   pinMode(28, OUTPUT); // DAC LDAC
 
 
-  pinMode(48, OUTPUT); // Future DAC 
-  pinMode(49, OUTPUT);
-  pinMode(46, OUTPUT);
-  pinMode(47, OUTPUT);
-  pinMode(44, OUTPUT);
-  pinMode(45, OUTPUT);
-  pinMode(42, OUTPUT);
-  pinMode(43, OUTPUT);
-  pinMode(40, OUTPUT);
-  pinMode(41, OUTPUT);
-  pinMode(38, OUTPUT);
-  pinMode(39, OUTPUT);
-  pinMode(36, OUTPUT);
-  pinMode(37, OUTPUT);
-  pinMode(34, OUTPUT);
-  pinMode(35, OUTPUT);
+  pinMode(49, OUTPUT); // DAC 2  Data
+  pinMode(48, OUTPUT); // DAC 1  Data
+  pinMode(47, OUTPUT); // DAC 4  Data
+  pinMode(46, OUTPUT); // DAC 3  Data
+  pinMode(45, OUTPUT); // DAC 6  Data
+  pinMode(44, OUTPUT); // DAC 5  Data
+  pinMode(43, OUTPUT); // DAC 8  Data
+  pinMode(42, OUTPUT); // DAC 7  Data
+  pinMode(37, OUTPUT); // DAC 14 Data
+  pinMode(36, OUTPUT); // DAC 13 Data
+  pinMode(35, OUTPUT); // DAC 16 Data
+  pinMode(34, OUTPUT); // DAC 15 Data
+  pinMode(33, OUTPUT); // DAC 10 Data
+  pinMode(32, OUTPUT); // DAC 11 Data
+  pinMode(31, OUTPUT); // DAC 9  Data
+  pinMode(30, OUTPUT); // DAC 12 Data
 
 }
 
-void multiShiftOut(int pins,int values){
+//void multiShiftOut(int pins,int values){
   //
-}
+//}
+
+void send_row(uint16_t *row);
+
+// L, R, DAC 1-16
+uint16_t row[18] = { // data to send out
+    0xCD3F, 0x222F,
+    0xDF31, 0x2B17, 0x200C, 0xFBFA,
+    0x2743, 0xA795, 0x46AE, 0x9DF2,
+    0xE4E9, 0x57B1, 0x9145, 0xD64D,
+    0xD784, 0xAA0D, 0x1B70, 0x967D,
+};
+
+#define MOTOR_CLOCK_PIN 2   // PORTD
+#define DAC_CLOCK_PIN 7     // PORTD
+
+#define CLOCK_BITS ((1 << MOTOR_CLOCK_PIN) | (1 << DAC_CLOCK_PIN))
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  // Falling edge
-  
-  //Most significant bit first
+    send_row(row);
+    int i;
+    for(i = 0; i <10; i++){
+      __asm__ volatile("nop\n\t");//1/16 us
+    }
+    PORTD &= ~CLOCK_BITS;                   // clock goes low
+    
+    delay(10);
+}
 
-  byte stateR = 0;
-  byte stateL = 0;
-  int i = 0;
-  int toSendR = 0xFAF5;
-  int toSendL = 0x0A05;
-  bool sendL[16];
-  bool sendR[16];
-  
-  //clock rising edge
-  digitalWrite(1, LOW); //R  
-  digitalWrite(2, LOW); //L  
-  digitalWrite(3, HIGH); //Clock
 
-  // Start Pream
-  digitalWrite(3, LOW); //Clock
-  for(i=15;i>=0;i-=1){
-    sendL[i]= bitRead( toSendR, i);
-    sendR[i]= bitRead( toSendL, i);
-  }
-  
-  //Send Pack
-  for(i=15;i>=0;i-=1){
-    digitalWrite(1, sendR[i]); //R
-    digitalWrite(2, sendL[i]); //L
-    digitalWrite(3, LOW); //Clock
-    digitalWrite(3, HIGH); //Clock
-  }
-  
 
-  delay(10);
+
+
+//rol rotate to right by source bits
+//lsl logical shift left
+
+#define start(out, in)  asm volatile("lsl %0" : "=r" (in)  : "0" (in)); \
+                        asm volatile("rol %0" : "=r" (out));
+
+#define build(out, in)  asm volatile("lsl %0" : "=r" (in)  : "0" (in)); \
+                        asm volatile("rol %0" : "=r" (out) : "0" (out));
+
+static inline __attribute__((always_inline)) void send_row_bytes(uint8_t *byte) {
+    register uint8_t array[18], pl, pd, pc;
+    int i;
+    
+    pd = PORTD | CLOCK_BITS;
+    
+    array[ 0] = byte[ 0];
+    array[ 1] = byte[ 2];
+    array[ 2] = byte[ 4];
+    array[ 3] = byte[ 6];
+    array[ 4] = byte[ 8];
+    array[ 5] = byte[10];
+    array[ 6] = byte[12];
+    array[ 7] = byte[14];
+    array[ 8] = byte[16];
+    array[ 9] = byte[18];
+    array[10] = byte[20];
+    array[11] = byte[22];
+    array[12] = byte[24];
+    array[13] = byte[26];
+    array[14] = byte[28];
+    array[15] = byte[30];
+    array[16] = byte[32];
+    array[17] = byte[34];
+    
+    for(i = 8; i > 0; i--) {
+        start(pl, array[ 8]);
+        build(pl, array[ 9]);
+        build(pl, array[ 6]);
+        build(pl, array[ 7]);
+        build(pl, array[ 4]);
+        build(pl, array[ 5]);
+        build(pl, array[ 2]);
+        build(pl, array[ 3]);
+        
+        PORTD = pd ^ CLOCK_BITS;
+        pd &= ~CLOCK_BITS;
+        pd >>= 2; // lose the two bits
+        build(pd, array[ 1]); // replace them
+        build(pd, array[ 0]);
+        
+        start(pc, array[13]);
+        build(pc, array[10]);
+        build(pc, array[12]);
+        build(pc, array[11]);
+        build(pc, array[16]);
+        build(pc, array[17]);
+        build(pc, array[14]);
+        build(pc, array[15]);
+        
+        PORTL = pl;
+        PORTD = pd;                         // clock goes high
+        PORTC = pc;
+    }
+
+    for(i = 0; i <8; i++){
+      __asm__ volatile("nop\n\t");//1/16 us
+    }
+
+    PORTD |= CLOCK_BITS;
 
 }
+
+void send_row(uint16_t *row) {
+    send_row_bytes((uint8_t*)row + 1);      // send all MSB's
+    send_row_bytes((uint8_t*)row);          // send all LSB's
+}
+
+/* 132 to first bit out clock high
+    25 to clock low, 25 to clock high    x7
+    80 to clock low, 25 to clock high
+    25 to clock low, 25 to clock high    x7
+    36 to clock low
+
+    3.125 us/bit max (320 kHz)
+    ~60 us total
+*/

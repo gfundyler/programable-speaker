@@ -30,6 +30,9 @@ void setup() {
   pinMode(38, OUTPUT); // DAC CLK
   pinMode(28, OUTPUT); // DAC LDAC
 
+  digitalWrite(27, 1); //DAC CS
+  digitalWrite(28, 1); //DAC LDAC
+  digitalWrite(38, 0); // DAC CLK
 
   pinMode(49, OUTPUT); // DAC 2  Data
   pinMode(48, OUTPUT); // DAC 1  Data
@@ -59,24 +62,32 @@ void send_row(uint16_t *row);
 // L, R, DAC 1-16
 uint16_t row[18] = { // data to send out
     0xCD3F, 0x222F,
-    0xDF31, 0x2B17, 0x200C, 0xFBFA,
+    0x7800, 0x2B17, 0x200C, 0xFBFA,
     0x2743, 0xA795, 0x46AE, 0x9DF2,
     0xE4E9, 0x57B1, 0x9145, 0xD64D,
     0xD784, 0xAA0D, 0x1B70, 0x967D,
 };
+
+
 
 #define MOTOR_CLOCK_PIN 2   // PORTD
 #define DAC_CLOCK_PIN 7     // PORTD
 
 #define CLOCK_BITS ((1 << MOTOR_CLOCK_PIN) | (1 << DAC_CLOCK_PIN))
 
+
+
 void loop() {
+    digitalWrite(27,0);
     send_row(row);
     int i;
     for(i = 0; i <10; i++){
       __asm__ volatile("nop\n\t");//1/16 us
     }
     PORTD &= ~CLOCK_BITS;                   // clock goes low
+    digitalWrite(27,1);
+    digitalWrite(28,0);
+    digitalWrite(28,1);
     
     delay(10);
 }

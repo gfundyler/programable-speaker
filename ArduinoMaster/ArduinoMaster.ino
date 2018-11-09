@@ -4,6 +4,9 @@
 // CLK    Out
   
 void setup() {
+  
+  Serial.begin(9600); 
+  
   // put your setup code here, to run once:
   pinMode(18, INPUT);  // 100 hz interrupt          
   pinMode(20, OUTPUT); // motor serial data R
@@ -61,13 +64,97 @@ void send_row(uint16_t *row);
 
 // L, R, DAC 1-16
 uint16_t row[18] = { // data to send out
-    0xCD3F, 0x222F,
+    //0xCD3F, 0x222F,
+    1, 350,
     0x7800, 0x2B17, 0x200C, 0xFBFA,
     0x2743, 0xA795, 0x46AE, 0x9DF2,
     0xE4E9, 0x57B1, 0x9145, 0xD64D,
     0xD784, 0xAA0D, 0x1B70, 0x967D,
 };
 
+uint16_t DAC[16] = {
+  0,0,0,0,
+  0,0,0,0,
+  0,0,0,0,
+  0,0,0,0,
+};
+
+uint16_t formatPacket(byte start){
+  // start as 8
+  // shift left 4 places
+  // add single one 1
+  // and with 01110000
+  uint16_t result = (uint16_t)start;
+  result = result << 4;
+  //111000000000000;
+  result = 0X7000 | result;
+  return  result;
+}
+
+
+byte modulatePacket(byte originalPacket){
+  // V*I
+  // V*(1-I)
+}
+
+//Lookup table 
+// 16 positions
+// 13 bytes
+// 
+
+// 0-255
+int getSpeedPedal(){
+  //TODO: swap with fast read
+  return (byte)(analogRead(A0) << 2);
+}
+
+// 0-255
+int getIntensity(){
+  //TODO: swap with fast read
+  return (byte)(analogRead(A1) << 2);
+}
+
+// 0-255
+int getVolumePedal(){
+  //TODO: swap with fast read
+  return (byte)(analogRead(A2) << 2);
+}
+
+
+byte ModulateEFF(int volume,int  intensity){
+  int result = (volume * intensity);
+  result = result >> 8;
+  return (byte) result;  
+}
+byte ModulateCenter(int volume,int intensity){
+  int result = (volume * (255 - intensity));
+  result = result >> 8;
+  return (byte) result;
+}
+
+void assignDAC(){
+  // Get pedal positions
+  byte pedalSpeed = getSpeedPedal();
+  byte volume = getVolumePedal();
+  byte intensity = getIntensity();
+
+  // perform modulations 
+  // modulatedC
+  DAC[0] = formatPacket(ModulateCenter(volume, intensity));
+  //modulatedEFF 
+  DAC[1]= formatPacket(ModulateEFF(volume, intensity));
+  
+  int i = 2;
+  for(i= 2; i< 16; i+=1){
+  // 14 unknown bytes from lookup table
+    DAC[i] = formatPacket(i);
+  };
+  for(i=2; i < 18; i+=1){
+    // Copy Function instead
+    row[i] = DAC[i-2];
+  }
+  
+}
 
 
 #define MOTOR_CLOCK_PIN 2   // PORTD
@@ -77,7 +164,7 @@ uint16_t row[18] = { // data to send out
 
 
 
-void loop() {
+void loop_real() {
     digitalWrite(27,0);
     send_row(row);
     int i;
@@ -88,11 +175,23 @@ void loop() {
     digitalWrite(27,1);
     digitalWrite(28,0);
     digitalWrite(28,1);
+
     
     delay(10);
 }
 
-
+void loop_test(){
+  Serial.println("Speed");
+  Serial.println(getSpeedPedal());
+  Serial.println("Intensity");
+  Serial.println(getIntensity());
+  Serial.println("Volume");
+  Serial.println(getVolumePedal());
+  delay(5000);
+}
+void loop(){
+ loop_test();
+}
 
 
 

@@ -1,3 +1,4 @@
+
 // 100 HZ INT in
 // Data R Out
 // Data L Out
@@ -65,7 +66,7 @@ void send_row(uint16_t *row);
 // L, R, DAC 1-16
 uint16_t row[18] = { // data to send out
     //0xCD3F, 0x222F,
-    1, 350,
+    1, 4000/*This is an invalid 1-360 is valid*/,
     0x7800, 0x2B17, 0x200C, 0xFBFA,
     0x2743, 0xA795, 0x46AE, 0x9DF2,
     0xE4E9, 0x57B1, 0x9145, 0xD64D,
@@ -189,8 +190,15 @@ void loop_test(){
   Serial.println(getVolumePedal());
   delay(5000);
 }
+void loop_clock_test(){
+ digitalWrite(38,1);
+ delay(100);
+ digitalWrite(38,0);
+ delay(100);
+}
 void loop(){
- loop_test();
+// loop_clock_test();
+ loop_real();
 }
 
 

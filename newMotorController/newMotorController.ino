@@ -1,179 +1,120 @@
-#include <SPI.h>
-//BEGIN
-//https://gist.github.com/argon/4578068
+//#include <SPI.h>
 
-//LEO PIN 8 should be SS for the Ethernet cable
-//Motor is lacking a clock currently
-
-
-char buf [100];
-volatile byte pos;
-volatile boolean process_it;
+//LEO PIN 8 should be SS for the Cat5 cable
+//Motor is lacking a clock currently(which clock is this referring to?)
 
 void setup() {
   // put your setup code here, to run once:
-  SetupForServo1();
-}
-
-//SPCR 0x002c 
-//SPSR 0x002d
-//SPDR 0x002e
-
-/*void SetupForServo(){
-
-
-
-  SPCR << 0xC0; 
-
- 
-
-  // bit 7 SPI Interrupt Enable = 1
-
-  // bit 6 SPI Enable =1
-
-  // bit 5 DORD: Data Order MSB First
-
-  // bit 4 MSTR: Master Slave select configured as slave
-
-  // bit 3 CPOL Clock polarity transfer on rising 
-
-  // bit 2 Clock Phase Sample on Leading
-
-  // bit 1&0 clock for master don't care
-
-
-
-  //TODO:
-
-  //Place ISR Start Address at $0030 
-
-  // 0x0030; assem ORG origin
-
   
-
-   __asm__                                 \
-
-    (                                      \
-
-        "SEI"   "\n\t"                     \
-
-     );           
-
-
-
-}*/
-
-
-void SetupForServo1(){
-  
-  /* Using Timer/Counter0 for SPI timeout (8-bit timer)
-   *  It takes about 32 us to receive a byte over SPI.
-   *  This timer configured for clk/8 yields 128 us for a timer overflow (counting from 0 to 255)
-   *  at 16 MHz system clock. Even clk/64 yielding 1.024 ms may be fine given the low update rate.
-   */
-  TCNT0 = 255;  // force overflow initially, to avoid false detection of second byte by SPI ISR
-  TCCR0B = 2;   // clk/8
-  
-
-  Serial.begin (9600);   // debugging
+  Serial.begin(9600);   // debugging
   
   // have to send on master in, *slave out*
 
   //pinMode(MOSI, INPUT);
   
   // turn on SPI in slave mode
-  SPCR |= _BV(SPE);
+  spi_enable();
 
   // turn on interrupts
-  SPCR |= _BV(SPIE);
-  
-  // get ready for an interrupt 
-  //pos = 0;   // buffer empty
-  process_it = false;
-  
+  SPCR |= bit(SPIE);
+
+  //TODO: setup correct SPI phase and polarity to match DACs
   
   //See also:
   //https://gist.github.com/argon/4578068
   
-  //  attachInterrupt(digitalPinToInterrupt(pin), ISR, mode);
-  SPI.attachInterrupt();
-
-
-  //SPCR << 0xC0 & 0x7F; 
- 
-  // bit 7 SPI Interrupt Enable = 1
-  // bit 6 SPI Enable =1
-  // bit 5 DORD: Data Order MSB First
-  // bit 4 MSTR: Master Slave select configured as slave
-  // bit 3 CPOL Clock polarity transfer on rising 
-  // bit 2 Clock Phase Sample on Leading
-  // bit 1&0 clock for master don't care
-
-  //TODO:
-  //Place ISR Start Address at $0030 
-  // 0x0030; assem ORG origin
-  
-  //Allow the slave to generate an interrupt upon SPI data register full
- /*  __asm__                                 \
-    (                                      \
-        "SEI"   "\n\t"                     \
-     );           */
-
-  
+  sck_detector_init();
 }
 
-uint16_t rx_word = 0;
+
+// ------------------------------ Receive Timer ------------------------------
+/* Using Timer/Counter0 for SPI timeout(8-bit timer)
+ *  It takes about 32 us to receive a byte over SPI.
+ *  This timer configured for clk/8 yields 128 us for a timer overflow(counting from 0 to 255)
+ *  at 16 MHz system clock. Even clk/64 yielding 1.024 ms may be fine given the low update rate.
+ */
+
+// has no effect if already started(continues running toward timeout)
+static void rxtimer_start(void) {
+  TCCR0B = 2;               // counter running at clk/8
+}
+
+static void rxtimer_stop(void) {
+  TCCR0B = 0;               // counter not running
+  TCNT0 = 0;                // reset counter
+  TIFR0 = bit(TOV0);        // reset overflow flag
+}
+
+static bool rxtimer_timeout(void) {
+  return TIFR0 & bit(TOV0);
+}
+
+
+// ------------------------------ SPI SCK Detector ------------------------------
+// NOTE: Make sure no other PCINTs are used.
+static void sck_detector_init(void) {
+  PCMSK0 = bit(PCINT1);
+}
+
+static void sck_detector_reset(void) {
+  PCIFR = bit(PCIF0);
+}
+
+// Indicates whether any activity occurred on the SPI SCK line since the last call to sck_detector_reset
+// NOTE: PCINT1 is the only one of PCINT7..0 to be enabled; otherwise this test would be ambiguous
+static bool sck_detected(void) {
+  return(PCIFR & bit(PCIF0)) == bit(PCIF0);
+}
+
+
+// ------------------------------ SPI ------------------------------
+volatile uint16_t rx_word = 0;
+volatile int rx_byte_count = 0;
+
+static void spi_enable(void) {
+  SPCR |= bit(SPE);
+}
+
+static void spi_disable(void) {
+  SPCR &= ~bit(SPE);
+}
 
 // SPI interrupt routine
 // This is automatically called by the Device Serial Peri Register is full
 
-ISR (SPI_STC_vect)
-{
-  rx_word = (rx_word << 8) | SPDR;
-  
-  if(TIFR0 & _BV(TOV0)) {   // overflow? this must be the first byte of a word, so set up to receive the second one   
-    TCNT0 = 0;                // reset counter
-    TIFR0 = _BV(TOV0);        // reset overflow flag
-  } else {                  // no overflow? then this is the second byte
-    TCNT0 = 255;              // force an overflow to guarantee the next byte is interpreted as the first byte of a word
-    process_it = true;        // use the received word
-  }
- 
-  /*byte c = SPDR;
-
-  // add to buffer if room
-  if (pos < sizeof buf) {
-    buf [pos++] = c;
-   
-    // example: newline means time to process buffer
-    if (c == '\n')
-      process_it = true;
-     
-  }  // end of room available
-  */
+ISR(SPI_STC_vect) {
+  rx_word =(rx_word << 8) | SPDR;
+  rx_byte_count++;
 }
 
 
-//END https://gist.github.com/argon/4578068
-void loop (void)
+// ------------------------------ Main ------------------------------
 
-{
-    Serial.println(SPDR);
+static void rx_reset(void) {
+  spi_disable();
+  rxtimer_stop();
+  rx_byte_count = 0;
+  sck_detector_reset();
+  spi_enable();
+}
 
-  if (process_it)
+void loop(void) {
+  
+  //Serial.println(SPDR);
 
-    {
+  if(rx_byte_count == 2) {
+    rx_reset();
 
-    buf [pos] = 0;  
+    // TODO: do something useful with rx_word
+    //buf[pos] = 0;  
+    Serial.println(rx_word);
+    //pos = 0;
 
-    Serial.println (buf);
-
-    pos = 0;
-
-    process_it = false;
-
-    }  // end of flag set
-
-    
+  } else if(rxtimer_timeout || rx_byte_count > 2) {
+    rx_reset();
+  } else if(sck_detected) {
+    rxtimer_start();
+    //sck_detector_reset();     // TODO: may be unnecessary
+  }
 
 }  // end of loop

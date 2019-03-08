@@ -401,7 +401,7 @@ void loop_real() {
       row = 0;
     }
     
-    delay(100);
+    delay(10);
 }
 
 void loop_test(){

@@ -3,11 +3,23 @@
 //LEO PIN 8 should be SS for the Cat5 cable
 //Motor is lacking a clock currently(which clock is this referring to?)
 
+
+
 void setup() {
   // put your setup code here, to run once:
   
   Serial.begin(9600);   // debugging
   
+  while(!Serial){
+      ; // waiting for connection
+  }
+
+  Serial.println("Up and running 1");
+
+  rx_init();
+}
+
+static void rx_init(void) {
   // have to send on master in, *slave out*
 
   //pinMode(MOSI, INPUT);
@@ -27,15 +39,13 @@ void setup() {
   
   sck_detector_init();
 
-  while(!Serial){
-      ; // waiting for connection
-  }
-
-  Serial.println("Up and running");
-
+  // Arduino apparently likes to mess with stuff behind your back.
+  // TCCR1A and TCCR1C are 0 on reset according to the Atmel datasheet,
+  // but apparently must be manually initialized when dealing with Arduino.
   TCCR1A = 0;
   TCCR1C = 0;
-  rxtimer_stop();       // initialize timer
+  
+  rxtimer_stop();       // initialize timer  
 }
 
 
@@ -111,6 +121,16 @@ static void rx_reset(void) {
   spi_enable();
 }
 
+typedef union {
+  struct {
+    uint16_t position :13;
+    uint16_t sync     : 2;
+    uint16_t strobe   : 1;
+  };
+  uint16_t word;
+} Packet;
+
+Packet packet;
 
 void loop(void) {
   
@@ -120,7 +140,12 @@ void loop(void) {
     // TODO: do something useful with rx_word
     //buf[pos] = 0;  
     //delay(100);
-    Serial.println(rx_word);
+    packet.word = rx_word;
+    Serial.print(packet.strobe);
+    Serial.print(" ");
+    Serial.print(packet.sync);
+    Serial.print(" ");
+    Serial.println(packet.position);
     rx_reset();
 
 

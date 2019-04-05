@@ -9,6 +9,9 @@ typedef struct {
   uint8_t dac[16];
 } ProfileRow;
 
+#define PATCH_UP 25
+#define PATCH_DN 26
+
 void setup() {
   
   Serial.begin(9600); 
@@ -32,8 +35,8 @@ void setup() {
   pinMode(A1, INPUT); // Effects Intensity Pedal
   pinMode(A2, INPUT); // Volume Pedal
 
-  pinMode(25, INPUT);  // PATCH Up
-  pinMode(26, INPUT);  // PATCH Down
+  pinMode(PATCH_UP, INPUT);  // PATCH Up
+  pinMode(PATCH_DN, INPUT);  // PATCH Down
 
   pinMode(27, OUTPUT); // DAC CS
   pinMode(38, OUTPUT); // DAC CLK
@@ -179,10 +182,14 @@ uint16_t row_u16[18];
 }*/
 
 #define PROFILE_TRY_DELAY 100   // count of iterations through the loop
-
 int loop_count = PROFILE_TRY_DELAY;
 
+byte patch_up_latch = HIGH;
+byte patch_dn_latch = HIGH;
+
 void loop_real() {
+    byte pin;
+  
     //ProfileRow row;
     digitalWrite(27,0);
     //profile_read(&row, sizeof(ProfileRow));
@@ -215,6 +222,20 @@ void loop_real() {
         profile_try_receive();                  // stops everything while receiving a new profile over serial
       }
     }*/
+
+    pin = digitalRead(PATCH_UP);
+    if(pin == LOW && patch_up_latch == HIGH) {
+      Serial.println("up");
+      profile_next(1);
+    }
+    patch_up_latch = pin;
+    
+    pin = digitalRead(PATCH_DN);
+    if(pin == LOW && patch_dn_latch == HIGH) {
+      Serial.println("dn");
+      profile_next(-1);
+    }
+    patch_dn_latch = pin;
     
     row_calculate_step(getSpeedPedal());
 }

@@ -51,19 +51,19 @@ File myFile;
 int16_t result = -10;   // TODO: this goes away
 uint32_t failures = 0;
 uint32_t filesize = 0;  // decremented as file is written
-char filename[13] = "LESLIE02.BIN"; // default filename
+char filename[13] = "LESLIE00.BIN"; // default filename
 int index = 0;                      // profile number
 
 void profile_open() {
-  Serial.print("Opening "); Serial.print(filename);
+  //Serial.print("Opening "); Serial.print(filename);
   myFile = SD.open(filename);
   if(myFile) {
-    Serial.println(" ... Success");
+    //Serial.println(" ... Success");
     myFile.seek(HEADER_SIZE);
     row_init();
   } else {
-    Serial.println(" ... Failed");
-  }
+    //Serial.println(" ... Failed");
+  }     // TODO: output first row and hold for a while
 }
 
 bool dataHandler(unsigned long no, char* data, int size) {
@@ -199,49 +199,45 @@ int16_t profile_read(void* buf, uint16_t nbyte) {
 #define PROFILE_MIN 00
 #define PROFILE_MAX 99
 
-int bound(int n, int min, int max) {
+int profile_wrap(int n, int min, int max) {
   if(n > max) {
     n = min;
   } else if(n < min) {
     n = max;
   }
+  return n;
 }
 
 int extract_index(char* filename) {
-  char index[3];
+  char num[3];
   int n;
-  index[0] = filename[6];
-  index[1] = filename[7];
-  index[2] = 0;
-  n = atoi(index);
-  return bound(n, PROFILE_MIN, PROFILE_MAX);
+  num[0] = filename[6];
+  num[1] = filename[7];
+  num[2] = 0;
+  n = atoi(num);
+  return profile_wrap(n, PROFILE_MIN, PROFILE_MAX);
 }
 
 /* Returns index (0-99) unless an error occurred:
- * -1 = Invalid direction
- * -2 = Could not open any file
+ * -1 = Could not open any file
  */
-int profile_next(int current, int direction) {
-  if(direction == 0) {
-    return -1;
-  }
-  
-  direction = bound(direction, -1, 1);
+int profile_next(int direction) {
+  int current;
   
   myFile.close();
   
-  current = bound( current, PROFILE_MIN, PROFILE_MAX);
-  index = current;
+  index = profile_wrap(index, PROFILE_MIN, PROFILE_MAX);
+  current = index;
   
   do {
     index += direction;
-    index = bound(index, PROFILE_MIN, PROFILE_MAX);    
+    index = profile_wrap(index, PROFILE_MIN, PROFILE_MAX);
     sprintf(filename, "LESLIE%02d.BIN", index);
     profile_open();
     if(myFile) {
-      return 0;
+      return index;
     }
   } while(index != current);
   
-  return index;
+  return -1;
 }

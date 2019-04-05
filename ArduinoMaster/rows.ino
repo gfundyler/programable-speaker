@@ -1,5 +1,7 @@
+// static qualifiers seem to do very little in the Arduino world
+
 #define PEDAL_MIN 40    // anything below this counts as normal speed w/o interpolation
-#define PEDAL_MAX 256   // 8-bit ADC
+#define PEDAL_MAX 1024  // 10-bit ADC
 #define ADVANCE_MAX 4.0 // limit of 15.0
 
 #define FIELDS 18
@@ -7,7 +9,7 @@
 #define ENCODER_COUNTS 0x1756
 
 // scale-factor calculation
-#define SCALE (uint16_t)(ONE * (ADVANCE_MAX - 1.0) / PEDAL_MAX)   // coarse but fast (0.0625 ADVANCE_MAX granularity w/ 8-bit ADC)
+#define SCALE (uint16_t)(ONE * (ADVANCE_MAX - 1.0) / PEDAL_MAX)   // coarse but fast (0.25 ADVANCE_MAX granularity w/ 10-bit ADC)
 
 static ProfileRow row[2];    // ping-pong buffers
 static ProfileRow *next = &row[0];
@@ -16,8 +18,8 @@ static ProfileRow *next = &row[0];
 // fixed-point 4.12 format
 #define STEP_INTEGER_BITS 4
 #define ONE 0x1000                // 1.0 (0x10000UL >> STEP_INTEGER_BITS)
-uint16_t row_step        = ONE;   // never less than ONE
-uint16_t row_accumulator = 0;
+static uint16_t row_step        = ONE;   // never less than ONE
+static uint16_t row_accumulator = 0;
 
 //#define current() (next == &row[0] ? &row[1] : &row[0])
 static ProfileRow* current() {

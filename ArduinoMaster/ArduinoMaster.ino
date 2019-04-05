@@ -104,22 +104,22 @@ uint16_t formatPacket(byte start){
 // 13 bytes
 // 
 
-// 0-255
+// 0-1023
 int getSpeedPedal(){
   //TODO: swap with fast read
-  return (byte)(analogRead(A0) << 2);
+  return analogRead(A0);
 }
 
 // 0-255
 int getIntensity(){
   //TODO: swap with fast read
-  return (byte)(analogRead(A1) << 2);
+  return (byte)(analogRead(A1) << 2);       // FIXME: produces 0-4095 then truncates, not 0-255
 }
 
 // 0-255
 int getVolumePedal(){
   //TODO: swap with fast read
-  return (byte)(analogRead(A2) << 2);
+  return (byte)(analogRead(A2) << 2);       // FIXME: produces 0-4095 then truncates, not 0-255
 }
 
 
@@ -136,7 +136,7 @@ byte ModulateCenter(int volume,int intensity){
 
 void assignDAC(){
   // Get pedal positions
-  byte pedalSpeed = getSpeedPedal();
+  //byte pedalSpeed = getSpeedPedal();
   byte volume = getVolumePedal();
   byte intensity = getIntensity();
 

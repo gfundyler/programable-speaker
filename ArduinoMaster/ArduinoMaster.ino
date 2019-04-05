@@ -169,20 +169,21 @@ void assignDAC(){
 
 uint16_t row_u16[18];
 
-void populate_row_u16(ProfileRow *data) {
+/*void populate_row_u16(ProfileRow *data) {
   int i;
   row_u16[0] = data->left;
   row_u16[1] = data->right;
   for(i = 0; i < 16; i++) {
     row_u16[i+2] = data->dac[i];
   }
-}
+}*/
 
 void loop_real() {
     ProfileRow row;
     digitalWrite(27,0);
-    profile_read(&row, sizeof(ProfileRow));
-    populate_row_u16(&row);
+    //profile_read(&row, sizeof(ProfileRow));
+    //populate_row_u16(&row);
+    row_next(row_u16);
     send_row(row_u16);
     int i;
     for(i = 0; i <10; i++){
@@ -196,14 +197,15 @@ void loop_real() {
     //row[1]++;
     //delay(10);
     
-    row++;
-    if(row >= ROWS) {
-      row = 0;
-    }
+    //row++;
+    //if(row >= ROWS) {
+    //  row = 0;
+    //}
     
     delay(10);
     
     profile_try_receive();                  // stops everything while receiving a new profile over serial
+    row_calculate_step(getSpeedPedal());
 }
 
 void loop_test(){

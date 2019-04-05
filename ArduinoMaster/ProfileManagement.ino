@@ -25,8 +25,7 @@
 #include <SPI.h>
 #include <SD.h>
 
-File myFile;
-int index;    // profile number
+#define HEADER_SIZE 256   // header content TBD
 
 int recvChar(int msDelay) {
   int cnt = 0;
@@ -48,23 +47,34 @@ void sendChar(char sym) {
   Serial.write(sym);
 }
 
+File myFile;
 int16_t result = -10;   // TODO: this goes away
-uint32_t filesize = 0;  // decremented as file is written
-//char filename[100] = {0};
 uint32_t failures = 0;
+uint32_t filesize = 0;  // decremented as file is written
+char filename[13] = "LESLIE00.BIN"; // default filename
+int index = 0;                      // profile number
+
+void profile_open() {
+  myFile = SD.open(filename);
+  if(myFile) {
+    myFile.seek(HEADER_SIZE);
+    row_init();
+  } 
+}
 
 bool dataHandler(unsigned long no, char* data, int size) {
-  char *filename, *sizestring;
+  //char *filename, *sizestring;
+  char *sizestring;
   //char *size_string, *delim;
   if(no == 0) {    // header containing filename and size
-    //strcpy(filename, data);
+    strncpy(filename, data, 12);  // 8.3 filename
     //size_string = data + strlen(data) + 1;
     //delim = strstr(size_string, " ");   // size, date, etc. are delimited with spaces
     //if(delim) {
     //  *delim = NULL;                    // null-terminate the file size
     //}
 
-    filename = data;
+    //filename = data;
     
     myFile.close();
 
@@ -85,7 +95,12 @@ bool dataHandler(unsigned long no, char* data, int size) {
       failures++;
       return false;
     }
-    if(size < filesize) {
+    if(size == 0) {                             // TODO: implement this in ymodem library
+      failures++;
+      filesize = 0;
+      myFile.close();
+      SD.remove(filename);
+    } else if(size < filesize) {
       myFile.write(data, size);
       filesize -= size;
     } else {
@@ -93,8 +108,8 @@ bool dataHandler(unsigned long no, char* data, int size) {
       filesize = 0;
       myFile.close();
       
-      myFile = SD.open(filename);           // open profile that was just received
       index = extract_index(filename);
+      profile_open();   // open profile that was just received
     }
   }
   return true;
@@ -111,8 +126,7 @@ void profile_setup() {
   }
   Serial.println("initialization done.");
   
-  myFile = SD.open("LESLIE00.bin");     // open profile 00 by default
-  index = 0;
+  profile_open();               // open default profile
 }
 
 void profile_try_receive() {
@@ -123,7 +137,7 @@ int16_t profile_read(void* buf, uint16_t nbyte) {
   int16_t result;
   result = myFile.read(buf, nbyte);
   if(result < nbyte) {                  // reached end of file (or error occurred), start over
-    myFile.seek(0);
+    myFile.seek(HEADER_SIZE);
     result = myFile.read(buf, nbyte);
   }
   return result;
@@ -155,8 +169,6 @@ int extract_index(char* filename) {
  * -2 = Could not open any file
  */
 int profile_next(int current, int direction) {
-  char filename[16];
-  
   if(direction == 0) {
     return -1;
   }
@@ -172,7 +184,7 @@ int profile_next(int current, int direction) {
     index += direction;
     index = bound(index, PROFILE_MIN, PROFILE_MAX);    
     sprintf(filename, "LESLIE%02d.BIN", index);
-    myFile = SD.open(filename);
+    profile_open();
     if(myFile) {
       return 0;
     }

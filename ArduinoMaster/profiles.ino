@@ -8,9 +8,9 @@
  This example shows how to read and write data to and from an SD card file
  The circuit:
  * SD card attached to SPI bus as follows:
- ** MOSI - pin 11
- ** MISO - pin 12
- ** CLK - pin 13
+ ** MOSI - pin 51
+ ** MISO - pin 50
+ ** CLK - pin 52
  ** CS - pin 4 (for MKRZero SD: SDCARD_SS_PIN)
 
  created   Nov 2010
@@ -51,15 +51,19 @@ File myFile;
 int16_t result = -10;   // TODO: this goes away
 uint32_t failures = 0;
 uint32_t filesize = 0;  // decremented as file is written
-char filename[13] = "LESLIE00.BIN"; // default filename
+char filename[13] = "LESLIE02.BIN"; // default filename
 int index = 0;                      // profile number
 
 void profile_open() {
+  Serial.print("Opening "); Serial.print(filename);
   myFile = SD.open(filename);
   if(myFile) {
+    Serial.println(" ... Success");
     myFile.seek(HEADER_SIZE);
     row_init();
-  } 
+  } else {
+    Serial.println(" ... Failed");
+  }
 }
 
 bool dataHandler(unsigned long no, char* data, int size) {
@@ -76,7 +80,9 @@ bool dataHandler(unsigned long no, char* data, int size) {
 
     //filename = data;
     
-    myFile.close();
+    if(myFile) {
+      myFile.close();
+    }
 
     if(SD.exists(filename)) {
       SD.remove(filename);
@@ -95,12 +101,12 @@ bool dataHandler(unsigned long no, char* data, int size) {
       failures++;
       return false;
     }
-    if(size == 0) {                             // TODO: implement this in ymodem library
+    /*if(size == 0) {                             // TODO: implement this in ymodem library
       failures++;
       filesize = 0;
       myFile.close();
       SD.remove(filename);
-    } else if(size < filesize) {
+    } else*/ if(size < filesize) {
       myFile.write(data, size);
       filesize -= size;
     } else {
@@ -108,7 +114,10 @@ bool dataHandler(unsigned long no, char* data, int size) {
       filesize = 0;
       myFile.close();
       
+      Serial.print("Wrote "); Serial.print(filename); Serial.print(" : "); Serial.println(sizestring);
+      
       index = extract_index(filename);
+      Serial.println(index);
       profile_open();   // open profile that was just received
     }
   }
@@ -125,7 +134,49 @@ void profile_setup() {
     while (1);
   }
   Serial.println("initialization done.");
-  
+
+  // open the file. note that only one file can be open at a time,
+  // so you have to close this one before opening another.
+  myFile = SD.open("test.txt", FILE_WRITE);
+
+  // if the file opened okay, write to it:
+  if (myFile) {
+    Serial.print("Writing to test.txt...");
+    myFile.println("testing 1, 2, 3.");
+    // close the file:
+    myFile.close();
+    Serial.println("done.");
+  } else {
+    // if the file didn't open, print an error:
+    Serial.println("error opening test.txt");
+  }
+
+  // re-open the file for reading:
+  myFile = SD.open("test.txt");
+  if (myFile) {
+    Serial.println("test.txt:");
+
+    // read from the file until there's nothing else in it:
+    while (myFile.available()) {
+      Serial.write(myFile.read());
+    }
+    // close the file:
+    myFile.close();
+  } else {
+    // if the file didn't open, print an error:
+    Serial.println("error opening test.txt");
+  }
+
+  /*if(Serial) {
+    result = modem.receive();
+    Serial.println("");
+    Serial.print("Tried "); Serial.println(filename);
+    Serial.println(filesize);
+    Serial.println(failures);
+    Serial.println(result);
+    Serial.println("Continuing startup...");
+  }*/
+
   profile_open();               // open default profile
 }
 
@@ -135,7 +186,9 @@ void profile_try_receive() {
 
 int16_t profile_read(void* buf, uint16_t nbyte) {
   int16_t result;
+  //Serial.print("Read from file... ");
   result = myFile.read(buf, nbyte);
+  //Serial.println(result);
   if(result < nbyte) {                  // reached end of file (or error occurred), start over
     myFile.seek(HEADER_SIZE);
     result = myFile.read(buf, nbyte);

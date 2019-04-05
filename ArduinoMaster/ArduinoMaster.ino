@@ -178,12 +178,17 @@ uint16_t row_u16[18];
   }
 }*/
 
+#define PROFILE_TRY_DELAY 100   // count of iterations through the loop
+
+int loop_count = PROFILE_TRY_DELAY;
+
 void loop_real() {
-    ProfileRow row;
+    //ProfileRow row;
     digitalWrite(27,0);
     //profile_read(&row, sizeof(ProfileRow));
     //populate_row_u16(&row);
     row_next(row_u16);
+    //Serial.println(row_u16[0]);
     send_row(row_u16);
     int i;
     for(i = 0; i <10; i++){
@@ -203,8 +208,14 @@ void loop_real() {
     //}
     
     delay(10);
+
+    /*if(--loop_count == 0) {   // once per second, check for file transfer from PC
+      loop_count = PROFILE_TRY_DELAY;
+      if(Serial) {
+        profile_try_receive();                  // stops everything while receiving a new profile over serial
+      }
+    }*/
     
-    profile_try_receive();                  // stops everything while receiving a new profile over serial
     row_calculate_step(getSpeedPedal());
 }
 

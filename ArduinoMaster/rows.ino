@@ -29,12 +29,16 @@ static ProfileRow* current() {
 void row_init() {
   profile_read(current(), sizeof(ProfileRow));
   profile_read(next, sizeof(ProfileRow));
+  Serial.println("row_init...");
+  //Serial.println(current()->left);
+  //Serial.println(next->left);
   row_accumulator = 0;
 }
 
 static void row_read_next() {
   next = current();
   profile_read(next, sizeof(ProfileRow));
+  //Serial.println(next->left);
 }
 
 void row_advance() {
@@ -47,6 +51,9 @@ void row_advance() {
 
 static uint16_t interpolate_angle(uint16_t a, uint16_t b, uint16_t fraction) {
   int16_t delta, weight, result;
+  uint16_t ab = (a | b) & 0xE000;
+  a &= 0x1FFF;
+  b &= 0x1FFF;
   
   delta = (int16_t)(b - a);
   if(delta < -ENCODER_COUNTS/2) {
@@ -64,7 +71,7 @@ static uint16_t interpolate_angle(uint16_t a, uint16_t b, uint16_t fraction) {
     result -= ENCODER_COUNTS;
   }
   
-  return (uint16_t)result;
+  return (uint16_t)result | ab;
 }
 
 static uint16_t interpolate_simple(uint16_t a, uint16_t b, uint16_t fraction) {
@@ -85,6 +92,7 @@ static void interpolate(uint16_t *interpolated, ProfileRow *a, ProfileRow *b, ui
 
 void row_next(uint16_t *processed) {
   interpolate(processed, current(), next, row_accumulator << 4);
+  //Serial.println(processed[1]);
   row_advance();
 }
 

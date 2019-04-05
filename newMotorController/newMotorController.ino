@@ -202,9 +202,9 @@ void setup() {
 
   Serial.begin(9600);   // debugging
   
-  while(!Serial){
+  /*while(!Serial){
       ; // waiting for connection
-  }
+  }*/
 
   Serial.println("Up and running 4");
 

@@ -12,6 +12,15 @@ typedef struct {
 #define PATCH_UP 25
 #define PATCH_DN 26
 
+#define DISPLAY_BIT0 A11
+#define DISPLAY_BIT1 A10
+#define DISPLAY_BIT2 A9
+#define DISPLAY_BIT3 A8
+#define DISPLAY_BIT4 A15
+#define DISPLAY_BIT5 A14
+#define DISPLAY_BIT6 A13
+#define DISPLAY_BIT7 A12
+
 void setup() {
   
   Serial.begin(9600); 
@@ -189,12 +198,13 @@ byte patch_dn_latch = HIGH;
 
 void loop_real() {
     byte pin;
+    bool new_profile;
   
     //ProfileRow row;
     digitalWrite(27,0);
     //profile_read(&row, sizeof(ProfileRow));
     //populate_row_u16(&row);
-    row_next(row_u16);
+    new_profile = row_next(row_u16);
     //Serial.println(row_u16[0]);
     send_row(row_u16);
     int i;
@@ -214,7 +224,11 @@ void loop_real() {
     //  row = 0;
     //}
     
-    delay(10);
+    if(new_profile) {
+      delay(1000);
+    } else {
+      delay(10);
+    }
 
     /*if(--loop_count == 0) {   // once per second, check for file transfer from PC
       loop_count = PROFILE_TRY_DELAY;
@@ -260,7 +274,19 @@ void loop(){
  loop_real();
 }
 
-
+void count_output(char *num) {
+  char n;
+  n = num[0];
+  digitalWrite(DISPLAY_BIT0, n & 1);
+  digitalWrite(DISPLAY_BIT1, n & 2);
+  digitalWrite(DISPLAY_BIT2, n & 4);
+  digitalWrite(DISPLAY_BIT3, n & 8);
+  n = num[1];
+  digitalWrite(DISPLAY_BIT4, n & 1);
+  digitalWrite(DISPLAY_BIT5, n & 2);
+  digitalWrite(DISPLAY_BIT6, n & 4);
+  digitalWrite(DISPLAY_BIT7, n & 8);
+}
 
 //rol rotate to right by source bits
 //lsl logical shift left

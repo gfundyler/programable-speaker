@@ -61,6 +61,7 @@ void profile_open() {
     //Serial.println(" ... Success");
     myFile.seek(HEADER_SIZE);
     row_init();
+    count_output(filename + 6);   // pointer to profile number within filename
   } else {
     //Serial.println(" ... Failed");
   }     // TODO: output first row and hold for a while

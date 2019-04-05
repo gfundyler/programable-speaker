@@ -20,6 +20,7 @@ static ProfileRow *next = &row[0];
 #define ONE 0x1000                // 1.0 (0x10000UL >> STEP_INTEGER_BITS)
 static uint16_t row_step        = ONE;   // never less than ONE
 static uint16_t row_accumulator = 0;
+static bool new_profile = true;
 
 //#define current() (next == &row[0] ? &row[1] : &row[0])
 static ProfileRow* current() {
@@ -33,6 +34,7 @@ void row_init() {
   //Serial.println(current()->left);
   //Serial.println(next->left);
   row_accumulator = 0;
+  new_profile = true;
 }
 
 static void row_read_next() {
@@ -90,10 +92,16 @@ static void interpolate(uint16_t *interpolated, ProfileRow *a, ProfileRow *b, ui
   }
 }
 
-void row_next(uint16_t *processed) {
+bool row_next(uint16_t *processed) {
+  bool temp;
+  
   interpolate(processed, current(), next, row_accumulator << 4);
   //Serial.println(processed[1]);
   row_advance();
+
+  temp = new_profile;
+  new_profile = false;
+  return temp;
 }
 
 void row_calculate_step(uint16_t pedal) {

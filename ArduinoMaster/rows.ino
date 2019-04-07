@@ -53,7 +53,13 @@ void row_advance() {
 
 static uint16_t interpolate_angle(uint16_t a, uint16_t b, uint16_t fraction) {
   int16_t delta, weight, result;
-  uint16_t ab = (a | b) & 0xE000;
+  uint16_t ab;
+
+  if(fraction == 0) {
+    return a;             // avoid any contamination from angle b
+  }
+  
+  ab = (a | b) & 0xE000;
   a &= 0x1FFF;
   b &= 0x1FFF;
   

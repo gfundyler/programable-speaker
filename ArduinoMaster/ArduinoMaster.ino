@@ -23,7 +23,7 @@ typedef struct {
 
 void setup() {
   
-  Serial.begin(9600); 
+  Serial.begin(9600);
   
   // put your setup code here, to run once:
   pinMode(18, INPUT);  // 100 hz interrupt          
@@ -73,7 +73,7 @@ void setup() {
   pinMode(30, OUTPUT); // DAC 12 Data
   
   profile_setup();
-
+  generate_row();   // generate the first row
 }
 
 //void multiShiftOut(int pins,int values){
@@ -176,11 +176,6 @@ void assignDAC(){
 
 #define CLOCK_BITS ((1 << MOTOR_CLOCK_PIN) | (1 << DAC_CLOCK_PIN))
 
-//uint16_t row = 0;
-//#define ROWS (sizeof(profile) / sizeof(ProfileRow))
-
-uint16_t row_u16[18];
-
 /*void populate_row_u16(ProfileRow *data) {
   int i;
   row_u16[0] = data->left;
@@ -191,67 +186,76 @@ uint16_t row_u16[18];
 }*/
 
 #define PROFILE_TRY_DELAY 100   // count of iterations through the loop
-int loop_count = PROFILE_TRY_DELAY;
 
 byte patch_up_latch = HIGH;
 byte patch_dn_latch = HIGH;
 
-void loop_real() {
-    byte pin;
-    bool new_profile;
+void process_buttons() {
+  byte pin;
+  pin = digitalRead(PATCH_UP);
+  if(pin == LOW && patch_up_latch == HIGH) {
+    Serial.println("up");
+    profile_next(1);
+  }
+  patch_up_latch = pin;
   
-    //ProfileRow row;
-    digitalWrite(27,0);
-    //profile_read(&row, sizeof(ProfileRow));
-    //populate_row_u16(&row);
-    new_profile = row_next(row_u16);
-    //Serial.println(row_u16[0]);
-    send_row(row_u16);
-    int i;
-    for(i = 0; i <10; i++){
-      __asm__ volatile("nop\n\t");//1/16 us
-    }
-    PORTD &= ~CLOCK_BITS;                   // clock goes low
-    digitalWrite(27,1);
-    digitalWrite(28,0);
-    digitalWrite(28,1);
+  pin = digitalRead(PATCH_DN);
+  if(pin == LOW && patch_dn_latch == HIGH) {
+    Serial.println("dn");
+    profile_next(-1);
+  }
+  patch_dn_latch = pin;
+}
 
-    //row[1]++;
-    //delay(10);
-    
-    //row++;
-    //if(row >= ROWS) {
-    //  row = 0;
-    //}
-    
-    if(new_profile) {
-      delay(1000);
-    } else {
-      delay(10);
-    }
+#define UPDATE_PERIOD_MS    10      // how often to send a new row (in ms)
+#define NEW_PROFILE_HOLDOFF 100     // on new profile, hold for this many UPDATE_PERIOD_MS intervals
 
-    /*if(--loop_count == 0) {   // once per second, check for file transfer from PC
-      loop_count = PROFILE_TRY_DELAY;
-      if(Serial) {
-        profile_try_receive();                  // stops everything while receiving a new profile over serial
+unsigned long t = 0;
+unsigned int profile_holdoff = NEW_PROFILE_HOLDOFF;
+uint16_t row_u16[18];
+
+void generate_row() {
+  bool new_profile;
+  new_profile = row_next(row_u16);
+  if(new_profile) {
+    profile_holdoff = NEW_PROFILE_HOLDOFF;
+  }
+}
+
+void loop_real() {
+    unsigned long t_new;
+
+    t_new = millis();
+    if(t_new - t >= UPDATE_PERIOD_MS) {
+      t = t_new;
+      //ProfileRow row;
+      digitalWrite(27,0);
+      //profile_read(&row, sizeof(ProfileRow));
+      //populate_row_u16(&row);
+
+      send_row(row_u16);
+      int i;
+      for(i = 0; i <10; i++){
+        __asm__ volatile("nop\n\t");//1/16 us
       }
-    }*/
+      PORTD &= ~CLOCK_BITS;                   // clock goes low
 
-    pin = digitalRead(PATCH_UP);
-    if(pin == LOW && patch_up_latch == HIGH) {
-      Serial.println("up");
-      profile_next(1);
+      if(profile_holdoff) {
+        profile_holdoff--;
+      } else {
+        generate_row();
+        //Serial.println(row_u16[0]);
+      }
+      digitalWrite(27,1);
+      digitalWrite(28,0);
+      digitalWrite(28,1);
+  
+      process_buttons();      
+      row_calculate_step(getSpeedPedal());
+      //Serial.println(getSpeedPedal());
     }
-    patch_up_latch = pin;
-    
-    pin = digitalRead(PATCH_DN);
-    if(pin == LOW && patch_dn_latch == HIGH) {
-      Serial.println("dn");
-      profile_next(-1);
-    }
-    patch_dn_latch = pin;
-    
-    row_calculate_step(getSpeedPedal());
+
+    command_byte(Serial.read());
 }
 
 void loop_test(){

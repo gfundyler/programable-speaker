@@ -1,0 +1,60 @@
+; File: xmodemsend.ttl
+; Description: Transmits a file to SuperLeslie using XMODEM protocol
+; Environment: Windows
+; Update: 2019/04/07
+; Author: Greg Fundyler
+
+; Example: ttpmacro.exe xmodemsend.ttl 3 C:\myfile.txt
+; Transmits C:\myfile.txt on COM3 using XMODEM protocol
+
+; Written by Greg Fundyler for Murray Clark's SuperLeslie project
+
+; param1 = macro filename
+; param2 = COM port #
+; param3 = source file path
+
+; TTL Command Reference: https://ttssh2.osdn.jp/manual/en/macro/command/index.html
+
+;connect '/C=11'
+comport = '/C='
+strconcat comport param2
+
+;srcfile = 'C:\Profiles\test.ttl'
+srcfile = param3
+
+connect comport
+if result != 2 then
+  messagebox 'Failed to connect' 'Error'
+  disconnect
+  closett
+  end
+endif
+
+;setbaud 9600
+
+; Arduino Mega 2560 restarts on connect, so wait n seconds to let it start up
+pause 1
+
+; filename = srcfile without path
+strmatch srcfile '[^\\]+$'
+filename = matchstr
+
+; size = size of srcfile
+filestat srcfile size
+
+; The escape character clears any previously entered characters (just in case)
+ESC = 27
+
+; flush receive buffer so xmodemsend doesn't get confused
+flushrecv
+
+; Transmit command: [ESC]download <filename> <size>[CR]
+sprintf2 cmd '%cdownload %s %d' ESC filename size
+sendln cmd
+
+; XMODEM send, default packet size of 128
+xmodemsend srcfile 1
+
+disconnect
+closett
+end

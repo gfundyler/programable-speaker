@@ -80,6 +80,7 @@ void profile_open_by_index(unsigned int index_to_open) {
 XModem modem(recvChar, sendChar, dataHandler);
 
 bool profile_download(char *fname, char *fsize) {
+  int tries;
   myFile.close();
   
   strncpy(filename, fname, 12);
@@ -87,10 +88,21 @@ bool profile_download(char *fname, char *fsize) {
   if(SD.exists(filename)) {
     SD.remove(filename);
   }
+
+  delay(1000);
   
-  myFile = SD.open(filename, FILE_WRITE);
-  if(!myFile) {
-    failures++;
+  for(tries = 10; tries > 0; tries--) {
+    myFile = SD.open(filename, FILE_WRITE);
+    if(!myFile) {
+      failures++;
+      delay(100);
+      //return false;
+    } else {
+      break;
+    }
+  }
+  
+  if(tries == 0) {
     return false;
   }
   
